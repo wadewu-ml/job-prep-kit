@@ -1,0 +1,38 @@
+{
+  "_说明": "空白配置骨架：所有【】处按本校就业网实际情况填写（字段含义对照 config.example.json 的合成示例；改法见《适配其他学校.md》）。填完后复制为 config.json 再运行脚本。",
+  "school": "【学校名】",
+  "base_url": "【目标站点的完整网址】",
+  "http": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "timeout": 20
+  },
+  "days": 3,
+  "future_days": 7,
+  "max_pages": 5,
+  "keywords": [
+    "【方向关键词1】",
+    "【方向关键词2】"
+  ],
+  "whitelist": {
+    "【企业名】": "【为什么对口（示例：名字不含关键词但对口，按名称子串匹配，可删改）】"
+  },
+  "exclude": [],
+  "list_pages": [
+    {
+      "key": "teachin",
+      "name": "宣讲会",
+      "path": "【列表页路径，如 /teachin】",
+      "page_path": "【翻页路径模板，{n} 为页码】",
+      "block_pattern": "【正则：切出单个条目区块】",
+      "link_pattern": "【正则：从区块提取详情链接】",
+      "date_mode": "event",
+      "filter_by_keywords": true,
+      "extra_patterns": {
+        "location": "【可选正则：提取地点】"
+      }
+    }
+  ],
+  "output_md": "../applications/宣讲会监控-latest.md",
+  "capture_dir": "captures",
+  "request_interval": 1
+}

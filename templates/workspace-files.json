@@ -1,0 +1,37 @@
+{
+  "applications": [
+    "applications/README.md",
+    "applications/宣讲会监控-latest.md"
+  ],
+  "reference": [
+    "reference/evidence-rules.md",
+    "reference/privacy.md"
+  ],
+  "lessons": [
+    "lessons/0001-薪资闸门与信息源分级.md",
+    "lessons/0002-宣讲会价值筛选.md",
+    "lessons/0003-技术叙事锚点.md",
+    "lessons/0004-内推两种提交模式.md",
+    "lessons/0005-适配性问题答法.md",
+    "lessons/0006-临场回答结构.md",
+    "lessons/0007-学校到公司思维转换.md",
+    "lessons/0008-反问环节策略.md",
+    "lessons/0009-对着JD讲匹配.md",
+    "lessons/0010-面试量与松弛度.md",
+    "lessons/README.md"
+  ],
+  "workflows": [
+    "workflows/01-简历制作.md",
+    "workflows/02-岗位筛选.md",
+    "workflows/03-投递管理.md",
+    "workflows/04-面试复盘.md",
+    "workflows/05-Offer决策.md",
+    "workflows/README.md"
+  ],
+  "resumes": [
+    "resumes/README.md"
+  ],
+  "scans": [
+    "scans/README.md"
+  ]
+}

@@ -1,0 +1,5 @@
+# 统一换行符为 LF，避免跨平台协作时的全文件 diff 噪音
+* text=auto eol=lf
+
+# Windows 脚本保持 CRLF
+*.bat text eol=crlf

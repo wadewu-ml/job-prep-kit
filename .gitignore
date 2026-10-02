@@ -1,0 +1,29 @@
+# 用户自己的抓取配置（含学校/个人信息，禁止提交）
+automation/config.json
+
+# 运行产物与日报（属用户私人数据）
+scans/*
+!scans/README.md
+automation/*.log
+
+# 简历 PDF（个人隐私，仅保留目录说明）
+resumes/*.pdf
+resumes/archive/
+
+# 系统 / 编辑器
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*~
+.vscode/
+.idea/
+
+# Personal workspace and local runtime artifacts
+/private/
+automation/captures/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+/dist/

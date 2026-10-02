@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "applications": [
+    {
+      "id": "synthetic-001",
+      "company": "示例企业",
+      "project": "合成校招项目",
+      "role": "示例岗位",
+      "status": "submitted",
+      "sources": {
+        "receipt": {
+          "kind": "employer",
+          "locator": "https://example.invalid/receipt",
+          "excerpt": "合成测试：已提交",
+          "checked_at": "2030-09-01T10:00:00+08:00"
+        }
+      },
+      "submission": {
+        "at": "2030-09-01T10:00:00+08:00",
+        "source": "receipt",
+        "resume_version": "general-v1"
+      },
+      "next_action": "准备面试",
+      "choices": [
+        "示例岗位"
+      ],
+      "events": [
+        {
+          "title": "合成测评截止",
+          "at": "2030-09-02T18:00:00+08:00",
+          "kind": "deadline",
+          "source": "receipt",
+          "done": false
+        }
+      ]
+    }
+  ]
+}

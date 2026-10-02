@@ -1,0 +1,63 @@
+{
+  "_说明": "合成配置，仅演示字段和静态列表结构。example.invalid 不是真实站点；不能直接运行获取招聘信息。请依据目标网站的实际 HTML 配置私人 config.json。",
+  "school": "示例机构（合成）",
+  "base_url": "https://example.invalid",
+  "http": {
+    "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    "referer": "https://example.invalid/",
+    "timeout": 20
+  },
+  "days": 3,
+  "future_days": 7,
+  "max_pages": 5,
+  "keywords": [
+    "示例关键词"
+  ],
+  "whitelist": {},
+  "exclude": [],
+  "list_pages": [
+    {
+      "key": "teachin",
+      "name": "宣讲会",
+      "path": "/teachin",
+      "page_path": "/teachin?page={n}",
+      "block_pattern": "<ul class=\"infoList teachinList\">.*?</ul>",
+      "link_pattern": "/teachin/view/id/(\\d+)",
+      "date_mode": "event",
+      "filter_by_keywords": true,
+      "extra_patterns": {
+        "location": "<li class=\"span4\">\\s*(.*?)\\s*</li>"
+      }
+    },
+    {
+      "key": "jobfair",
+      "name": "招聘会",
+      "path": "/jobfair",
+      "page_path": "/jobfair?page={n}",
+      "block_pattern": "<ul class=\"infoList jobfairList\">.*?</ul>",
+      "link_pattern": "/jobfair/view/id/(\\d+)",
+      "date_mode": "event",
+      "filter_by_keywords": true,
+      "extra_patterns": {
+        "location": "<li class=\"span3\">\\s*(.*?)\\s*</li>"
+      }
+    },
+    {
+      "key": "recruit",
+      "name": "招聘公告",
+      "path": "/campus/index/category/1",
+      "page_path": "/campus/index/category/1?page={n}",
+      "block_pattern": "<ul class=\"infoList\">.*?</ul>",
+      "link_pattern": "/campus/view/id/(\\d+)",
+      "date_mode": "publish",
+      "filter_by_keywords": true,
+      "max_items": 30,
+      "extra_patterns": {
+        "region": "<li class=\"span1\"[^>]*>\\s*(.*?)\\s*</li>"
+      },
+      "_note": "招聘公告默认同样按关键词/白名单/排除词过滤；想看全量改成 filter_by_keywords=false，max_items 截断"
+    }
+  ],
+  "output_md": "../applications/宣讲会监控-latest.md",
+  "capture_dir": "captures"
+}
