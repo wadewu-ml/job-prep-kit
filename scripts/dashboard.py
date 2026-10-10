@@ -33,18 +33,50 @@ def link(label, value, workspace, missing_hint=True):
     return f'<a href="{escape(href, quote=True)}" rel="noreferrer">{escape(label)}</a>'
 
 
-def date_label(value, now, relative=False):
+def date_label(value, now, relative=False, estimated=False):
     when = datetime.fromisoformat(value)
     local_now = now.astimezone(when.tzinfo)
     days = (when.date() - local_now.date()).days
     prefix = {0: "今天", 1: "明天", 2: "后天"}.get(days) if relative else None
     prefix = prefix or when.strftime("%m月%d日" if when.year == local_now.year else "%Y年%m月%d日")
     zone = when.strftime("%z")
-    return f'<time datetime="{escape(value, quote=True)}" title="UTC{zone[:3]}:{zone[3:]}">{prefix} {when:%H:%M}</time>'
+    return f'<time datetime="{escape(value, quote=True)}" title="UTC{zone[:3]}:{zone[3:]}">{prefix} {"约 " if estimated else ""}{when:%H:%M}</time>'
 
 
 def material_links(app, workspace):
-    return "".join(link(MATERIALS.get(key, key), value, workspace) for key, value in app.get("materials", {}).items())
+    """Keep materials together instead of repeating them for every event."""
+    groups = {}
+    seen = set()
+    for key, value in app.get("materials", {}).items():
+        if value in seen:
+            continue
+        seen.add(value)
+        group = {"jd": "岗位与简历", "resume": "岗位与简历", "interview": "准备材料", "experience": "准备材料", "offer": "录用条件"}.get(key, "补充材料")
+        groups.setdefault(group, []).append(f'<li>{link(MATERIALS.get(key, key), value, workspace)}</li>')
+    return "".join(f'<div class="material-group"><h5>{label}</h5><ul>{"".join(items)}</ul></div>' for label, items in groups.items())
+
+
+def paragraphs(value):
+    lines = [line.strip() for line in value.splitlines() if line.strip()]
+    if len(lines) > 1:
+        return '<ul class="reading-list">' + ''.join(f'<li>{escape(line)}</li>' for line in lines) + '</ul>'
+    return f'<p>{escape(value)}</p>'
+
+
+def event_kind(event):
+    return "推算时间" if event.get("time_precision") == "estimated" else KINDS[event["kind"]]
+
+
+def event_history(app, now):
+    rows = []
+    for event in sorted(app["events"], key=lambda e: datetime.fromisoformat(e["at"])):
+        stamp = date_label(event["at"], now, estimated=event.get("time_precision") == "estimated")
+        completion = "已完成" if event.get("done") else "未标记完成"
+        note = paragraphs(event["note"]) if event.get("note") else ""
+        if event.get("done_source"):
+            note += '<p>完成依据：' + escape(app["sources"][event["done_source"]]["excerpt"]) + '</p>'
+        rows.append(f'<li><p>{stamp} · {event_kind(event)} · {completion}</p><p>{escape(event["title"])}</p>{note}</li>')
+    return ''.join(rows)
 
 
 def pending_events(app):
@@ -67,65 +99,62 @@ def collect_actions(apps, now):
     return sorted(actions, key=lambda item: item[:3])
 
 
-def action_html(app, index, event, workspace, now, compact=False):
-    brief = app.get("brief", {})
+def action_html(app, index, event, now):
     elapsed = event and datetime.fromisoformat(event["at"]) < now
     if event:
-        stamp = date_label(event["at"], now, relative=True)
-        label = "时间已过 · 请核实" if elapsed else KINDS[event["kind"]]
-        event_name = f' · {escape(event["title"])}' if elapsed else ""
-        meta = f'{stamp}{event_name} <span class="tag {"attention" if elapsed else ""}">{label}</span>'
-        title = "核实这项安排的最新状态" if elapsed else event["title"]
+        estimated = event.get("time_precision") == "estimated"
+        stamp = date_label(event["at"], now, relative=True, estimated=estimated)
+        label = "时间已过 · 请核实" if elapsed else ("推算时间 · 待核实" if estimated else event_kind(event))
+        meta = f'<p class="action-date">{stamp}</p><span class="tag {"attention" if elapsed or estimated else ""}">{label}</span>'
+        title = event["title"]
+        note = f'<p class="event-note">{escape(event["note"])}</p>' if event.get("note") else ""
+        if elapsed:
+            note += '<p class="event-note">核实这项安排的最新状态，不据时间推断结果。</p>'
     else:
-        meta = "下一步"
+        meta = '<p class="action-date">下一步</p>'
         title = app.get("next_action", "查看岗位记录")
-    context = ""
-    if not compact:
-        for label, value in (("推进理由", brief.get("reason")), ("准备重点", brief.get("preparation") if not elapsed else None), ("关键待核", brief.get("question"))):
-            if value:
-                context += f'<div class="context-line"><dt>{label}</dt><dd>{escape(value)}</dd></div>'
-    materials = material_links(app, workspace)
-    return f'''<article class="action {"secondary" if compact else "primary"}">
-<p class="eyebrow">{meta}</p><h3>{escape(title)}</h3>
-<p class="job-ref"><a href="#job-{index}">{escape(app['company'])} · {escape(app['role'])}</a></p>
-{f'<dl class="context">{context}</dl>' if context else ''}
-{f'<div class="material-links">{materials}</div>' if materials else ''}</article>'''
+        note = ""
+    return f'''<article class="action">
+<div class="action-meta">{meta}</div><h3>{escape(title)}</h3>{note}
+<p class="job-ref">{escape(app['company'])}</p>
+<a class="action-link" href="#prep-{index}">查看准备任务 <span aria-hidden="true">→</span></a></article>'''
 
 
 def opportunity_html(app, index, workspace, now):
     brief = app.get("brief", {})
     state = app["status"]
     group = "closed" if state in CLOSED else ("candidate" if state in CANDIDATES else "active")
-    events = pending_events(app) if state not in CLOSED else []
-    next_event = events[0] if events else None
-    summary = escape(brief.get("reason") or brief.get("work") or "尚未记录岗位判断")
-    question = f'<p class="question"><span>待核实</span>{escape(brief["question"])}</p>' if brief.get("question") and state not in CLOSED else ""
     action = app.get("next_action") or ("等待新反馈" if state in {"waiting", "submitted"} else "尚未记录下一步")
     if state in CLOSED:
         action = "记录已归档"
-    timing = ""
-    if next_event:
-        expired = datetime.fromisoformat(next_event["at"]) < now
-        timing = f'<p class="timing {"elapsed" if expired else ""}">{date_label(next_event["at"], now, True)} · {escape(next_event["title"])}{" · 时间已过，请核实" if expired else ""}</p>'
     checked = max((s["checked_at"] for s in app["sources"].values()), key=datetime.fromisoformat, default=None)
     checked_text = f'最近核验 {date_label(checked, now)}' if checked else "来源尚未登记"
     materials = material_links(app, workspace)
     source_rows = "".join(f'<li>{link(SOURCES[s["kind"]], s["locator"], workspace, False)} · {date_label(s["checked_at"], now)}<p>{escape(s["excerpt"])}</p><small>{escape(s["locator"])}</small></li>' for s in app["sources"].values())
-    history = "".join(f'<li>{date_label(e["at"], now)} · {escape(e["title"])} · {KINDS[e["kind"]]} · {"已完成" if e.get("done") else "未标记完成"}</li>' for e in sorted(app["events"], key=lambda e: datetime.fromisoformat(e["at"])))
-    submission = app.get("submission", {})
-    submitted = date_label(submission["at"], now) if submission else "尚未提交"
+    history = event_history(app, now)
+    submission = app.get("submission") or {}
+    submitted = date_label(submission["at"], now) if submission else "提交凭证未登记，原始申请时间及岗位关联未知"
     attachment = submission.get("resume_version") or submission.get("resume_unavailable_reason") or "尚无已发附件"
     details = ""
-    work = f'<p class="work">{escape(brief["work"])}</p>' if brief.get("work") else ""
-    for label, value in (("实际工作", brief.get("work")), ("准备重点", brief.get("preparation")), ("需要你参与", app.get("needs_user") if state not in CLOSED else None)):
-        if value:
-            details += f'<p><strong>{label}</strong> {escape(value)}</p>'
+    if app.get("stage_evidence"):
+        evidence = app["stage_evidence"]
+        source = app["sources"][evidence["source"]]
+        details += f'<p><strong>阶段凭证</strong> {link(SOURCES[source["kind"]], source["locator"], workspace, False)} · {escape(source["excerpt"])}</p><p><strong>提交历史缺口</strong> {escape(evidence["submission_unavailable_reason"])}</p>'
+        if not submission:
+            details += '<p>通知确认当前阶段；原始申请时间及岗位关联未知，不计入已投。</p>'
+    overview = "".join(f'<div class="fact"><dt>{label}</dt><dd>{paragraphs(value)}</dd></div>' for label, value in (("岗位情况", brief.get("work")), ("推进理由", brief.get("reason"))) if value)
+    question = f'<div class="question"><h5>待核条件</h5>{paragraphs(brief["question"])}</div>' if brief.get("question") and state not in CLOSED else ""
+    preparation = f'<div class="practice"><h5>准备重点</h5>{paragraphs(brief["preparation"])}</div>' if brief.get("preparation") else ""
     return f'''<article class="opportunity" id="job-{index}" data-group="{group}">
-<div class="opportunity-row"><div><h3>{escape(app['company'])}</h3><p class="role">{escape(app['role'])}</p>{work}
-<p class="identity"><span class="tag">{STATUS[state]}</span>{escape(app.get('location', '地点待核实'))}</p></div>
-<div class="assessment"><p>{summary}</p>{question}</div><div class="next-step"><p>{escape(action)}</p>{timing}</div></div>
-<details><summary>资料与记录 <span>{checked_text}</span></summary><div class="record-body">
-<div class="material-links">{materials or '<span class="muted">尚未关联材料</span>'}</div>{details}
+<div class="job-header"><div><h3>{escape(app['company'])}</h3><p class="role">{escape(app['role'])}</p></div>
+<p class="identity"><span class="tag">{STATUS[state]}</span><span>{escape(app.get('location', '地点待核实'))}</span></p></div>
+<div class="workspace-modules">
+<section class="module overview" aria-labelledby="overview-{index}"><h4 id="overview-{index}">岗位概况</h4>{f'<dl>{overview}</dl>' if overview else '<p class="muted">尚未记录岗位情况。</p>'}{question}</section>
+<section class="module preparation" id="prep-{index}" aria-labelledby="prep-title-{index}"><h4 id="prep-title-{index}">准备任务</h4><div class="next-step"><h5>下一步</h5>{paragraphs(action)}</div>{preparation}</section>
+<section class="module materials" aria-labelledby="materials-{index}"><h4 id="materials-{index}">相关材料</h4>{materials or '<p class="muted">尚未关联材料。</p>'}</section>
+</div>
+<details class="records"><summary>来源与历史记录 <span>{checked_text}</span></summary><div class="record-body">
+{details}
 <p class="muted">{escape(app['id'])} · {escape(app['project'])}</p>
 <p>提交：{submitted}<br>实际附件：{escape(attachment)}</p>
 {f'<h4>日程记录</h4><ul>{history}</ul>' if history else ''}<h4>信息来源</h4><ul>{source_rows or '<li>来源待补</li>'}</ul>
@@ -140,13 +169,14 @@ def render_dashboard(data, workspace, now=None):
     actions = collect_actions(apps, now)
     personal = [(i, app) for i, app in enumerate(apps) if app["status"] not in CLOSED and app.get("needs_user")]
     action_count = len(actions) + len(personal)
-    nav = "".join(link(label, path, workspace) for label, path in (("目标与偏好", "PROFILE.md"), ("简历底稿", "resumes/source/master.md"), ("经历库", "records/facts.md")))
+    workspace_links = data.get("workspace_links", {"目标与偏好": "PROFILE.md", "简历底稿": "resumes/source/master.md", "经历库": "records/facts.md"})
+    nav = "".join(link(label, path, workspace) for label, path in workspace_links.items())
+    scope_note = f'<details class="scope-note" aria-label="数据范围"><summary>本页记录范围 · 查看说明</summary><div style="white-space: pre-wrap">{escape(data["scope_note"])}</div></details>' if "scope_note" in data else ""
     if actions:
-        rendered = [action_html(apps[i], i, event, workspace, now, compact=n > 0) for n, (_, _, i, event) in enumerate(actions[:3])]
-        secondary = '<div class="up-next">' + ''.join(rendered[1:]) + '</div>' if len(rendered) > 1 else ''
-        focus = f'<div class="focus-layout {"single" if len(rendered) == 1 else ""}">{rendered[0]}{secondary}</div>'
+        rendered = [action_html(apps[i], i, event, now) for _, _, i, event in actions[:3]]
+        focus = f'<div class="focus-layout columns-{min(len(rendered), 2)}">{"".join(rendered)}</div>'
         if len(actions) > 3:
-            extra = "".join(f'<li><a href="#job-{i}">{escape(apps[i]["company"])} · {escape(event["title"] if event else apps[i].get("next_action", "查看记录"))}</a>{" · " + date_label(event["at"], now, True) if event else ""}</li>' for _, _, i, event in actions[3:])
+            extra = "".join(f'<li><a href="#job-{i}">{escape(apps[i]["company"])} · {escape(event["title"] if event else apps[i].get("next_action", "查看记录"))}</a>{" · " + date_label(event["at"], now, True, event.get("time_precision") == "estimated") if event else ""}{" · " + event_kind(event) if event else ""}{" · " + escape(event["note"]) if event and event.get("note") else ""}</li>' for _, _, i, event in actions[3:])
             focus += f'<details class="more-actions"><summary>还有 {len(actions) - 3} 项已登记事项</summary><ul>{extra}</ul></details>'
     elif personal:
         focus = ""
@@ -158,10 +188,10 @@ def render_dashboard(data, workspace, now=None):
         focus += f'<div class="personal-tasks" role="region" aria-labelledby="personal-title"><h3 id="personal-title">需要你参与 · {len(personal)} 项</h3><ul>{tasks}</ul></div>'
     rows = "".join(opportunity_html(app, i, workspace, now) for i, app in enumerate(apps) if app["status"] not in CLOSED)
     rows += "".join(opportunity_html(app, i, workspace, now).replace('data-group="closed"', 'data-group="closed" hidden') for i, app in enumerate(apps) if app["status"] in CLOSED)
-    opportunities = f'''<section class="opportunities" aria-labelledby="opportunity-title"><div class="section-heading"><h2 id="opportunity-title">值得继续看的机会</h2><span id="visible-count" aria-live="polite">当前 {len(active)} 条</span></div>
-<div class="filters"><div class="tabs" aria-label="岗位范围"><button type="button" data-filter="current" aria-pressed="true">当前机会</button><button type="button" data-filter="candidate" aria-pressed="false">待申请</button><button type="button" data-filter="closed" aria-pressed="false">已结束</button><button type="button" data-filter="all" aria-pressed="false">全部</button></div>
+    show_filters = len(apps) > 1 or len(active) != len(apps)
+    opportunities = f'''<section class="opportunities" aria-labelledby="opportunity-title"><div class="section-heading"><h2 id="opportunity-title">当前岗位</h2><span id="visible-count" aria-live="polite">当前 {len(active)} 条</span></div>
+<div class="filters" {"" if show_filters else "hidden"}><div class="tabs" aria-label="岗位范围"><button type="button" data-filter="current" aria-pressed="true">当前岗位</button><button type="button" data-filter="candidate" aria-pressed="false">待申请</button><button type="button" data-filter="closed" aria-pressed="false">已结束</button><button type="button" data-filter="all" aria-pressed="false">全部</button></div>
 <label class="search-label">查找岗位<input id="search" type="search" placeholder="企业、岗位或关键词" autocomplete="off"></label></div>
-<div class="list-heading"><span>岗位与阶段</span><span>推进理由 · 关键疑问</span><span>下一步</span></div>
 <div class="opportunity-list">{rows}</div><p id="empty" class="empty-list" {"hidden" if active else ""}>当前没有匹配的岗位，可切换范围查看。</p></section>''' if apps else ""
     css = Path(__file__).with_name("dashboard.css").read_text(encoding="utf-8")
     js = Path(__file__).with_name("dashboard.js").read_text(encoding="utf-8")
@@ -169,10 +199,10 @@ def render_dashboard(data, workspace, now=None):
     return f'''{MARKER}
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="referrer" content="no-referrer"><title>求职工作台 · job-prep-kit</title><style>{css}</style></head>
-<body><main><header><div class="brand">JOB PREP KIT <span>个人求职工作区</span></div><nav aria-label="我的材料">{nav}</nav></header>{demo_notice}
+<body><main><header><div class="brand">JOB PREP KIT <span>个人求职工作区</span></div><nav aria-label="我的材料">{nav}</nav></header>{demo_notice}{scope_note}
 <div class="intro"><div><h1>求职工作台</h1><p>先处理重要安排，再投入合适的机会。</p></div><p class="snapshot" data-generated="{now.isoformat()}">本地快照<br>{date_label(now.astimezone().isoformat(), now)}</p></div>
 <p id="stale" class="stale" hidden>此快照不是今天生成的，日程标签以生成时为准。请更新记录并重新生成。</p>
-<section aria-labelledby="focus-title"><div class="section-heading"><h2 id="focus-title">现在先做什么</h2><span>{f'{action_count} 项已登记事项' if action_count else '按当前记录'}</span></div>{focus}</section>
+<section aria-labelledby="focus-title"><div class="section-heading"><h2 id="focus-title">近期安排</h2><span>{f'{action_count} 项已登记事项' if action_count else '按当前记录'}</span></div>{focus}</section>
 {opportunities}<footer><span>资料留在本地 · 来源与原件随岗位保留</span><span>记录更新后，重新生成并刷新本页。</span></footer>
 </main><script>{js}</script></body></html>'''
 

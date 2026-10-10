@@ -22,6 +22,7 @@ def module(relative):
 
 watch = module("automation/career_watch.py")
 tracker = module("scripts/tracker.py")
+dashboard = module("scripts/dashboard.py")
 initializer = module("scripts/init_workspace.py")
 resume = module("scripts/resume_manifest.py")
 
@@ -36,7 +37,99 @@ def sample():
     }]}
 
 
+def notice_sample():
+    data = sample()
+    app = data["applications"][0]
+    del app["submission"]
+    app["status"] = "interview"
+    app["sources"]["receipt"].update(kind="personal_notice", excerpt="合成通知：确认进入面试，原申请岗位关联未知")
+    app["stage_evidence"] = {"source": "receipt", "submission_unavailable_reason": "合成历史缺口：原始申请时间及岗位关联未知"}
+    return data
+
+
 class TrackerTests(unittest.TestCase):
+    def test_notice_confirms_stage_without_submission_time(self):
+        for state in ("assessment", "interview", "waiting", "offer", "signed"):
+            for kind in ("employer", "personal_notice"):
+                with self.subTest(state=state, kind=kind):
+                    data = notice_sample()
+                    app = data["applications"][0]
+                    app["status"] = state
+                    app["sources"]["receipt"]["kind"] = kind
+                    if state in {"offer", "signed"}:
+                        app["result"] = {"source": "receipt"}
+                    self.assertIs(tracker.validate(data), data)
+                    self.assertNotIn("submission", app)
+
+    def test_stage_evidence_fields_are_strict(self):
+        invalid = [None, [], {}, {"source": "receipt"},
+                   {"source": [], "submission_unavailable_reason": "合成缺口"},
+                   {"source": "missing", "submission_unavailable_reason": "合成缺口"},
+                   {"source": "receipt", "submission_unavailable_reason": "  "},
+                   {"source": "receipt", "submission_unavailable_reason": 1},
+                   {"source": "receipt", "submission_unavailable_reason": "合成缺口", "at": "未知"}]
+        for evidence in invalid:
+            with self.subTest(evidence=evidence):
+                data = notice_sample()
+                data["applications"][0]["stage_evidence"] = evidence
+                with self.assertRaisesRegex(ValueError, "stage_evidence"):
+                    tracker.validate(data)
+        for kind in ("school", "community", "other"):
+            with self.subTest(kind=kind):
+                data = notice_sample()
+                data["applications"][0]["sources"]["receipt"]["kind"] = kind
+                with self.assertRaisesRegex(ValueError, "stage_evidence.source"):
+                    tracker.validate(data)
+
+    def test_stage_evidence_does_not_bypass_submission_or_result(self):
+        data = notice_sample()
+        data["applications"][0]["status"] = "submitted"
+        with self.assertRaisesRegex(ValueError, "submitted 必须有提交记录"):
+            tracker.validate(data)
+        for state in ("offer", "signed", "rejected"):
+            for result in (None, {"source": "missing"}, {"source": "third-party"}):
+                with self.subTest(state=state, result=result):
+                    data = notice_sample()
+                    app = data["applications"][0]
+                    app["status"] = state
+                    app["sources"]["third-party"] = dict(app["sources"]["receipt"], kind="community")
+                    if result is not None:
+                        app["result"] = result
+                    with self.assertRaisesRegex(ValueError, "正式结果"):
+                        tracker.validate(data)
+
+    def test_notice_is_separate_from_submission_counts(self):
+        data = notice_sample()
+        views = tracker.render(data)
+        table = "\n".join(views["投递总表.md"])
+        self.assertIn("仅统计有提交凭证的记录：已投企业/统一项目 0；已投记录 0", table)
+        self.assertIn("另有 1 条通知确认阶段", table)
+        for lines in views.values():
+            text = "\n".join(lines)
+            self.assertIn("阶段凭证", text)
+            self.assertIn("合成历史缺口", text)
+            self.assertNotIn("尚未提交", text)
+        other = sample()["applications"][0]
+        other["id"] = "synthetic-002"
+        data["applications"].append(other)
+        table = "\n".join(tracker.render(data)["投递总表.md"])
+        self.assertIn("已投企业/统一项目 1；已投记录 1", table)
+        self.assertIn("明确登记的志愿 1", table)
+        self.assertIn("另有 1 条通知确认阶段", table)
+
+    def test_optional_top_level_fields_are_validated(self):
+        for field, invalid in (("scope_note", [None, "", " \n", 1, []]),
+                               ("workspace_links", [None, [], {"": "sample.md"}, {"材料": " "}, {"材料": 1}, {1: "sample.md"}])):
+            for value in invalid:
+                with self.subTest(field=field, value=value):
+                    data = sample()
+                    data[field] = value
+                    with self.assertRaisesRegex(ValueError, field):
+                        tracker.validate(data)
+        data = sample()
+        data.update(scope_note="合成局部数据", workspace_links={})
+        tracker.validate(data)
+
     def test_malformed_nested_fields_are_actionable(self):
         for field, value in (("sources", {"receipt": None}), ("submission", []),
                              ("events", [None]), ("result", None), ("status", [])):
@@ -101,6 +194,74 @@ class TrackerTests(unittest.TestCase):
                 tracker.write_views(folder, tracker.render(sample()))
             self.assertFalse((p / "投递总表.md").exists())
             self.assertEqual((p / "时间轴.md").read_text(encoding="utf-8"), "手写记录")
+
+
+class DashboardTests(unittest.TestCase):
+    def test_notice_and_candidate_never_claim_not_submitted(self):
+        data = notice_sample()
+        with tempfile.TemporaryDirectory() as folder:
+            html = dashboard.render_dashboard(tracker.validate(data), folder)
+            self.assertIn("阶段凭证", html)
+            self.assertIn("合成历史缺口", html)
+            self.assertIn("不计入已投", html)
+            self.assertNotIn("尚未提交", html)
+            app = data["applications"][0]
+            app["status"] = "candidate"
+            del app["stage_evidence"]
+            html = dashboard.render_dashboard(tracker.validate(data), folder)
+            self.assertNotIn("尚未提交", html)
+            self.assertIn("提交凭证未登记", html)
+
+    def test_scope_note_is_literal_and_escaped_in_all_views(self):
+        data = notice_sample()
+        note = '  合成局部数据，非全量\n</pre><script>alert("synthetic")</script>& **原文** [链接](javascript:alert(1))  '
+        data["scope_note"] = note
+        from html import escape
+        with tempfile.TemporaryDirectory() as folder:
+            html = dashboard.render_dashboard(tracker.validate(data), folder)
+            self.assertIn(escape(note), html)
+            self.assertLess(html.index('aria-label="数据范围"'), html.index('<h1>'))
+            self.assertNotIn('<script>alert("synthetic")</script>', html)
+            for lines in tracker.render(data).values():
+                text = "\n".join(lines)
+                self.assertIn("<pre>" + escape(note) + "</pre>", text)
+                self.assertNotIn('<script>alert("synthetic")</script>', text)
+
+    def test_custom_navigation_uses_existing_external_materials(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            workspace = root / "workspace"
+            workspace.mkdir()
+            material = root / "synthetic-existing.txt"
+            material.write_text("合成已有材料", encoding="utf-8")
+            data = notice_sample()
+            data["workspace_links"] = {"合成材料 <一>": str(material), "相对材料": "../synthetic-existing.txt", "不安全": "javascript:alert(1)"}
+            before = set(root.rglob("*"))
+            html = dashboard.render_dashboard(tracker.validate(data), workspace)
+            nav = html.split('<nav aria-label="我的材料">', 1)[1].split('</nav>', 1)[0]
+            self.assertEqual(nav.count(material.resolve().as_uri()), 2)
+            self.assertIn("合成材料 &lt;一&gt;", nav)
+            self.assertNotIn("javascript:", nav)
+            self.assertNotIn("目标与偏好", nav)
+            self.assertEqual(set(root.rglob("*")), before)
+            del data["workspace_links"]
+            self.assertIn("目标与偏好", dashboard.render_dashboard(data, workspace))
+            data["workspace_links"] = {}
+            self.assertIn('<nav aria-label="我的材料"></nav>', dashboard.render_dashboard(data, workspace))
+
+    def test_synthetic_workspace_generates_all_views(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            data = notice_sample()
+            data["scope_note"] = "合成局部台账，非全量"
+            tracker.validate_workspace(root, data)
+            tracker.write_views(root, tracker.render(data))
+            target = dashboard.write_dashboard(root, data)
+            self.assertIn("通知确认当前阶段", target.read_text(encoding="utf-8"))
+            self.assertEqual(len(list((root / "applications").iterdir())), 4)
+            for path in (root / "applications").iterdir():
+                self.assertIn(data["scope_note"], path.read_text(encoding="utf-8"))
+            self.assertNotIn("submission", data["applications"][0])
 
 
 class WorkspaceTests(unittest.TestCase):
