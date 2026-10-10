@@ -6,20 +6,25 @@ Keep the job description, the résumé you sent, the latest reply, and your next
 
 ## Getting started
 
-Download or clone this repository. With Python 3.10 or later installed, run:
+Download or clone this repository, then point your file-capable AI assistant at [SKILL.md](SKILL.md). Give it a résumé, a folder of project notes or a job description, and say what you want to work on:
+
+> Use SKILL.md. My existing résumé is at `<path>`. Help me tailor it to this job description, using only experience supported by my materials.
+
+The assistant reads what you already have, keeps reusable facts in a private workspace and asks about gaps that affect the task. You do not need to complete every template first. Document generation and website access use the tools available to your assistant.
+
+With Python 3.10 or later, the assistant (or you) can create a workspace with:
 
 ```sh
 python scripts/init_workspace.py
 ```
 
-This creates a `private/` workspace. Open `private/START.md`, add your preferences to `private/PROFILE.md`, and start with the task you need to do. Existing documents can stay where they are; record their paths instead of copying everything.
-
-The scripts use the Python standard library. There are no packages to install. To use the notes without Python, copy the templates you need into a separate folder.
+This creates `private/START.md`. Existing documents can stay where they are; record their paths instead of copying everything. The scripts use only the Python standard library. To use the notes without Python, copy the templates you need into a separate folder.
 
 ## Working through a job search
 
 | Task | Guide |
 | --- | --- |
+| Bring in existing materials and reuse experience | [Material intake](workflows/00-材料导入.md) |
 | Turn your experience into a clear résumé | [Résumé writing](workflows/01-简历制作.md) |
 | Read job descriptions and decide where to apply | [Role selection](workflows/02-岗位筛选.md) |
 | Complete applications and follow up on replies | [Applications](workflows/03-投递管理.md) |
@@ -38,9 +43,13 @@ Update `private/applications/data.json`, then run:
 python scripts/tracker.py render --workspace private
 ```
 
-The script produces an application table, a timeline, and a schedule covering overdue items, today, and the next seven days. Completed events stay in the timeline but leave the to-do list. Edit the JSON record rather than the generated tables.
+Open `private/applications/dashboard.html` in your browser. The page puts upcoming commitments and concrete next steps first. Below them, a compact opportunity list shows why a role is worth pursuing, what still needs checking, and the next step. Job descriptions, the résumé actually sent, relevant experience and interview notes stay linked to each role. Search the list or switch to completed applications; expand a row for materials and sources.
 
-Prefer a spreadsheet or a handwritten table? Use your existing record or the [manual template](applications/投递总表.md). The JSON tracker is optional.
+The dashboard is a local, read-only snapshot: no server, account or network connection is required. Ask the assistant to update the ledger, rerun the command and refresh the page. The same command also generates the application table, timeline and schedule. Completed events leave the schedule; offers awaiting a decision remain active. Waiting for a reply does not create a follow-up task. Optional role summaries can be added as you work; there is no profile-completion score or required intake form.
+
+`records/facts.md` doubles as the experience index. Longer project notes can live in separate files, linked from that index. Applications can link existing materials through optional `materials` fields; there is no second copy of the tracking data.
+
+Prefer a spreadsheet or a handwritten table? Keep your existing record. The JSON tracker and dashboard are optional.
 
 To try the tracker with fictional data:
 

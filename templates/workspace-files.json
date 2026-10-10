@@ -21,6 +21,7 @@
     "lessons/README.md"
   ],
   "workflows": [
+    "workflows/00-材料导入.md",
     "workflows/01-简历制作.md",
     "workflows/02-岗位筛选.md",
     "workflows/03-投递管理.md",

@@ -36,6 +36,17 @@ def validate(data):
         fields(app, path, ("id", "company", "project", "role", "status"))
         if "next_action" in app and not isinstance(app["next_action"], str):
             raise ValueError(f"{path}.next_action 必须是字符串")
+        if "needs_user" in app and not isinstance(app["needs_user"], str):
+            raise ValueError(f"{path}.needs_user 必须是字符串")
+        if "location" in app and not isinstance(app["location"], str):
+            raise ValueError(f"{path}.location 必须是字符串")
+        if "brief" in app:
+            fields(app["brief"], f"{path}.brief")
+            for key, value in app["brief"].items():
+                if not isinstance(value, str):
+                    raise ValueError(f"{path}.brief.{key} 必须是字符串")
+        if "materials" in app:
+            fields(app["materials"], f"{path}.materials", app["materials"].keys() if isinstance(app["materials"], dict) else ())
         for key in ("sources", "events"):
             if key not in app:
                 raise ValueError(f"缺少字段 {key}")
@@ -123,6 +134,8 @@ def render(data, now=None):
             next_actions.append(f"- 附件待补：{cell(app['id'])} {cell(app['submission']['resume_unavailable_reason'])}")
         if app.get("next_action") and app["status"] not in {"withdrawn", "rejected", "signed"}:
             next_actions.append(f"- {cell(app['id'])}：{cell(app['next_action'])}")
+        if app.get("needs_user") and app["status"] not in {"withdrawn", "rejected", "signed"}:
+            next_actions.append(f"- 待本人处理：{cell(app['id'])} {cell(app['needs_user'])}")
     events = sorted(((timestamp(e["at"]), a, e) for a in apps for e in a["events"]), key=lambda item: item[0])
     for when, app, event in events:
         source = app["sources"].get(event.get("source"), {})
@@ -160,7 +173,9 @@ if __name__ == "__main__":
         for warning in validate_workspace(args.workspace, data):
             print("提醒：" + warning)
         if args.command == "render":
+            from dashboard import write_dashboard
             write_views(args.output_dir or args.workspace, render(data))
-        print("校验通过" if args.command == "validate" else "已生成三份视图；以 data.json 为准")
+            print("本地看板：" + str(write_dashboard(args.workspace, data, args.output_dir)))
+        print("校验通过" if args.command == "validate" else "已生成三份视图和看板；以 data.json 为准")
     except (ValueError, OSError, KeyError, TypeError) as exc:
         parser.exit(1, str(exc) + "\n")

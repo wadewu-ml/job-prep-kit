@@ -17,7 +17,7 @@ python scripts/tracker.py validate --workspace private
 python scripts/tracker.py render --workspace private
 ```
 
-只维护 private/applications/data.json。总表、时间轴、日程为生成视图。遇到手工旧文件会拒绝覆盖，先用 --output-dir private/preview 生成新视图，核对迁移后再使用。生成器不会改 data.json，不会自动把扫描候选变成申请。
+只维护 private/applications/data.json。总表、时间轴、日程和 dashboard.html 都是生成视图。双击 private/applications/dashboard.html 即可查看，无服务器、无网络依赖；更新台账后重新 render 并刷新页面。遇到手工旧文件会拒绝覆盖，先用 --output-dir private/preview 生成新视图，核对迁移后再使用。生成器不会改 data.json，不会自动把扫描候选变成申请。看板含个人记录和文件路径，同样不要上传；它只展示台账，不自动核实来源或改变状态。
 
 数据样例见 ../templates/application-example.json，**全部为合成资料，不是实际可投岗位**。顶层 schema_version=1，applications 为数组。
 
@@ -27,7 +27,15 @@ python scripts/tracker.py render --workspace private
 - submission：实际提交时间 at、凭证 source、实际附件 resume_version；没有真实凭证不填。流程中状态必须关联提交记录。resume_version 可直接填写实际发送的附件版本或文件名，不要求先登记哈希。历史附件确实缺失时，用 resume_unavailable_reason 说明原因，不同时填写 resume_version；工具会明确提醒待补，不会把真实投递改成未投。
 - events：title、at、kind、source、done；可选 notified_at。kind=deadline/scheduled/suggested。官方日期必须关联直接来源。通知到达和截止分开。
 - result：offer/signed/rejected 状态需要 result.source 指向正式结果来源，个人感觉不作为结果。
-- next_action：当前下一动作。工具优先列出逾期、当天及未来七天的未完成节点，再列下一动作；不自动提醒，不把逾期推断为淘汰。
+- materials（可选）：关联文件或官方网页，如 `{"jd":"applications/role-001/jd.md","resume":"resumes/archive/general-v1.pdf","interview":"interviews/role-001.md"}`。文件路径相对个人工作区，也接受现有文件的绝对路径；已有材料无需迁移。看板可点击打开本地文件，未找到时提示待补。resume 指向实际发出的留存件，不是不断变化的当前稿。
+- needs_user（可选）：确实需要本人处理的事项，用一句话说明；解决后删除或清空，不必给每个岗位填。
+- location（可选）：已知工作地；不清楚时省略，不推断。
+- brief（可选）：助手处理该岗位时留下的短摘要，可按需填 `work`（实际工作）、`reason`（推进理由）、`question`（影响选择的待核条件）、`preparation`（准备重点）。内容依据已有 JD、经历和复盘，原文仍由 materials 和 sources 关联；不是新一套必填表，也不生成匹配分数。
+- next_action：岗位当前的下一动作；每条日程以自己的 title 展示，避免多个节点套用同一句下一动作。工具不自动提醒，不把逾期推断为淘汰。
+
+看板顶部优先展示未来七天的正式安排，然后是时间已过待核实的事项、建议时间和其他明确下一步。最多突出三项，其余可展开。本人待办单独完整列出，不受三项上限影响，也不因同一岗位已有日程而隐藏；已结束记录的待办不再列出。无日期事项按台账顺序展示，不代表计算出的机会排名。submitted/waiting 的普通 next_action 留在岗位列表；确有跟进安排时再登记事件或 needs_user，不因等待时间长而自动催办。已结束记录默认收起，可筛选查看。
+
+`materials` 可增加 `experience` 关联相关经历、`offer` 关联录用条件文件。看板将样式和交互内嵌进一个 HTML，分发或本地打开不需要旁边再放 CSS/JS 文件。相对“今天/明天”按生成时间计算，跨日后重新生成；来源核验时间和页面生成时间分别展示。
 
 时间使用带时区 ISO 格式，例如 2030-09-02T18:00:00+08:00。只有日期而没有具体时刻的原文先放 next_action 和来源摘录，核实后再录精确提醒；不要编造23:59。正文、来源与原文件是否真实仍由用户/助手核验，校验器只检查结构和来源关联。
 
