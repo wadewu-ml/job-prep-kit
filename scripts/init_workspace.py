@@ -13,7 +13,7 @@ def initialize(destination, demo=False):
     if destination.exists():
         raise ValueError("目标已存在；为保护已有资料，不覆盖。请选择空的新目录。")
     destination.mkdir(parents=True)
-    for name in ("README.md", "AGENTS.md", "MISSION.md", "PROFILE.md", "company-info.md", "学校行政流程.md"):
+    for name in ("README.md", "AGENTS.md", "MISSION.md", "PROFILE.md", "company-info.md", "school-procedures.md"):
         shutil.copy2(ROOT / name, destination / name)
     for name in ("applications", "reference", "lessons", "workflows", "resumes", "scans"):
         # Only the versioned template allowlist is copied, never arbitrary attachments.
