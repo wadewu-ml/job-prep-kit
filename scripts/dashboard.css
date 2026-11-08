@@ -17,6 +17,7 @@ nav a{padding:3px 0}
 .scope-note{font-size:15px;margin-top:14px;color:var(--muted)}.scope-note>div{margin-top:10px;padding:16px 20px;border-left:3px solid #afc5b4;background:#eaf0e7}
 summary{cursor:pointer;font-size:16px;line-height:1.8;list-style-position:inside;overflow-wrap:anywhere}
 .intro{display:flex;justify-content:space-between;align-items:center;gap:24px;margin:26px 0 32px}.intro p{color:var(--muted);margin-top:7px}.intro .snapshot{font-size:14px;text-align:right;flex-shrink:0}
+.focus-note{margin-bottom:26px;padding:18px 22px;background:#e9f0e2;border-left:4px solid var(--accent);border-radius:7px;overflow-wrap:anywhere}.focus-note p{margin-top:6px}
 .section-heading{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:18px}.section-heading>span{font-size:15px;color:var(--muted)}
 .focus-layout{display:grid;gap:20px}.columns-1{grid-template-columns:1fr}.columns-2{grid-template-columns:repeat(2,minmax(0,1fr))}
 .columns-2 .action:last-child:nth-child(odd){grid-column:span 2}

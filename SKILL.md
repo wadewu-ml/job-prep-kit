@@ -1,6 +1,6 @@
 ---
 name: job-prep-kit
-description: Help with a job search using existing résumés, experience notes and job descriptions. Use to prepare or tailor a résumé, assess roles, track applications and replies, prepare for interviews, or compare offers in a local workspace.
+description: Help with a job search using existing résumés, experience notes and job descriptions. Use to prepare or tailor a résumé, assess roles, track applications and replies, prepare for interviews, compare offers, or turn significant events into reusable lessons in a local workspace.
 ---
 
 # Job preparation
@@ -10,6 +10,8 @@ Work from the user's materials and finish the task they asked for. Do not requir
 ## Start with what exists
 
 Locate the user's workspace and read its `PROFILE.md` and `records/facts.md` if present. Use the material paths they supplied; do not search unrelated personal folders. Reuse confirmed answers and authorization.
+
+Check the user's current goal before reviving old tasks. A pause, a decision to stop applying, or a move to signing and paperwork changes what to follow up; it does not establish employer rejection or withdrawal. Keep historical status and evidence intact. For the JSON tracker, optional `focus` records this intent separately; current user instructions take precedence.
 
 For a new workspace, run `python scripts/init_workspace.py` from this skill's directory, or pass `--dest` with the user's chosen location. If it already exists, use it without reinitializing. Personal content belongs there, not in the public templates. Scripts live alongside this skill; `--workspace` always points to the personal directory.
 
@@ -25,12 +27,19 @@ If the user provided an old résumé, project notes or a folder of materials, fo
 | Apply, record a reply or follow up | [Applications](workflows/03-投递管理.md) |
 | Prepare for an assessment or review an interview | [Interview preparation](workflows/04-面试复盘.md) |
 | Compare offers | [Offer decisions](workflows/05-Offer决策.md) |
+| Learn from a completed preparation session, interview or significant event | [Review and reuse](workflows/06-复盘与经验复用.md) |
 
 Read only the relevant experience entries and job materials. Keep `records/facts.md` as the index; longer experience files are optional. A résumé, an application answer and an interview explanation may emphasize different details but must use the same facts.
 
 For the JSON tracker, update `applications/data.json`, then run `python scripts/tracker.py render --workspace <workspace>`. This generates the tables and `applications/dashboard.html`; it does not submit applications. Link existing JD, sent résumé and interview files through optional `materials` fields. See [tool usage](scripts/README.md) only when those fields or commands are needed. Preserve an existing manual tracker if the user prefers it.
 
 When assessing or preparing for a role, retain a short, evidence-based reason to pursue it, the question that could change the decision, and the next preparation focus in its optional `brief`. Link the relevant experience through `materials.experience`. Reuse the source notes; do not require these summaries before starting work or turn waiting for a reply into an invented task.
+
+## Learn once, use again
+
+After a completed interview, meaningful preparation session or significant decision or setback, proactively offer a brief review when there is something useful to learn. Use the existing project records to draft it; ask only about missing observations that matter. Do not infer completion from an elapsed date or require a review for every routine step. Follow [review and reuse](workflows/06-复盘与经验复用.md) for where to save it and when to extract a lesson.
+
+Before later résumé, role, preparation or offer advice, check the private `lessons/README.md` and relevant linked reviews. Read the actual notes that apply, check their conditions against the present situation, and explain what they changed in the recommendation with links to those notes. If nothing applies, proceed from current evidence. Event observations, personal preferences and tentative explanations remain distinct; a past lesson is not a verified hiring rule. Optional `brief.basis`, `materials.review` and `materials.lessons` make this reasoning accessible from the dashboard.
 
 ## Evidence and output
 

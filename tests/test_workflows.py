@@ -3,8 +3,10 @@ import sys
 import importlib.util
 import json
 import hashlib
+import subprocess
 import tempfile
 import unittest
+import zipfile
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -25,6 +27,7 @@ tracker = module("scripts/tracker.py")
 dashboard = module("scripts/dashboard.py")
 initializer = module("scripts/init_workspace.py")
 resume = module("scripts/resume_manifest.py")
+packager = module("scripts/package_source.py")
 
 
 def sample():
@@ -196,6 +199,98 @@ class TrackerTests(unittest.TestCase):
             self.assertEqual((p / "时间轴.md").read_text(encoding="utf-8"), "手写记录")
 
 
+class FocusTests(unittest.TestCase):
+    now = datetime(2030, 9, 21, 9, tzinfo=timezone.utc)
+
+    def test_old_unresolved_event_stays_in_history_without_recycled_task(self):
+        data = sample()
+        data["applications"][0]["status"] = "interview"
+        before = copy.deepcopy(data)
+        self.assertEqual(dashboard.collect_actions(data["applications"], self.now), [])
+        views = tracker.render(data, self.now)
+        schedule = "\n".join(views["投递日程.md"])
+        current = schedule.split("<details>", 1)[0]
+        self.assertNotIn("合成测评截止", current)
+        self.assertNotIn("准备面试", current)
+        self.assertIn("合成测评截止", schedule)
+        self.assertIn("合成测评截止", "\n".join(views["时间轴.md"]))
+        html = dashboard.render_dashboard(data, ROOT, self.now)
+        self.assertIn("较早的未确认事项 · 1 项", html)
+        self.assertNotIn('<article class="action">', html)
+        self.assertEqual(data, before)
+
+    def test_recent_window_and_completion(self):
+        data = sample()
+        app = data["applications"][0]
+        app["events"] = [{"title": str(days), "at": (self.now + timedelta(days=days)).isoformat(),
+                          "kind": "scheduled", "source": "receipt", "done": False}
+                         for days in (-30, -7, -1, 0, 7, 8)]
+        app["events"].append(dict(app["events"][3], title="done", done=True))
+        actions = dashboard.collect_actions(tracker.validate(data)["applications"], self.now)
+        self.assertEqual({event["title"] for _, _, _, event in actions}, {"-7", "-1", "0", "7"})
+        app["events"] = [app["events"][-2]]  # The only pending event is more than a week away.
+        self.assertEqual(dashboard.collect_actions(data["applications"], self.now), [])
+
+    def test_closing_keeps_signed_paperwork_but_not_other_recruitment(self):
+        data = sample()
+        app = data["applications"][0]
+        app.update(status="signed", result={"source": "receipt"}, next_action="核对合成协议签章")
+        app["events"] = [dict(app["events"][0], title="旧招聘安排", at=self.now.isoformat()),
+                         dict(app["events"][0], title="合成材料核对", at=self.now.isoformat(), category="closing")]
+        other = copy.deepcopy(app)
+        other.update(id="synthetic-002", status="interview", next_action="不应恢复的准备", needs_user="不应恢复的旧问题")
+        data["applications"].append(other)
+        data["focus"] = {"mode": "closing", "application_ids": [app["id"]], "note": "合成场景：只办理指定事项"}
+        before = copy.deepcopy(data)
+        actions = dashboard.collect_actions(data["applications"], self.now, data["focus"])
+        self.assertEqual([(i, event["title"]) for _, _, i, event in actions], [(0, "合成材料核对")])
+        schedule = "\n".join(tracker.render(data, self.now)["投递日程.md"])
+        self.assertIn("合成材料核对", schedule)
+        self.assertIn("核对合成协议签章", schedule)
+        self.assertNotIn("旧招聘安排", schedule)
+        self.assertNotIn("不应恢复", schedule)
+        html = dashboard.render_dashboard(data, ROOT, self.now)
+        self.assertIn('id="job-0" data-group="active"', html)
+        self.assertIn('id="job-1" data-group="closed" hidden', html)
+        self.assertNotIn("不应恢复", html.split('<details class="records">', 1)[0])
+        self.assertEqual(data, before)
+        # A signed record without explicit closing intent stays out of the schedule.
+        self.assertFalse(tracker.follows(app))
+
+    def test_pause_and_complete_hide_tasks_without_altering_facts(self):
+        for mode in ("paused", "complete"):
+            data = sample()
+            data["applications"][0].update(status="interview", needs_user="合成待本人处理")
+            data["focus"] = {"mode": mode, "note": "<合成范围>"}
+            before = copy.deepcopy(data)
+            tracker.validate(data)
+            html = dashboard.render_dashboard(data, ROOT, self.now)
+            self.assertNotIn('<article class="action">', html)
+            self.assertNotIn('class="personal-tasks"', html)
+            self.assertIn('id="job-0" data-group="closed" hidden', html)
+            self.assertIn("&lt;合成范围&gt;", html)
+            schedule = "\n".join(tracker.render(data, self.now)["投递日程.md"])
+            self.assertNotIn("准备面试", schedule)
+            self.assertNotIn("合成待本人处理", schedule)
+            self.assertEqual(data, before)
+
+    def test_focus_references_and_event_categories_are_validated(self):
+        for focus in (None, [], {}, {"mode": "other"}, {"mode": "closing"},
+                      {"mode": "active", "application_ids": "synthetic-001"},
+                      {"mode": "active", "application_ids": [None]},
+                      {"mode": "closing", "application_ids": ["missing"]},
+                      {"mode": "paused", "note": []}):
+            with self.subTest(focus=focus):
+                data = sample()
+                data["focus"] = focus
+                with self.assertRaisesRegex(ValueError, "focus"):
+                    tracker.validate(data)
+        data = sample()
+        data["applications"][0]["events"][0]["category"] = "other"
+        with self.assertRaisesRegex(ValueError, "category"):
+            tracker.validate(data)
+
+
 class DashboardTests(unittest.TestCase):
     def test_notice_and_candidate_never_claim_not_submitted(self):
         data = notice_sample()
@@ -263,6 +358,24 @@ class DashboardTests(unittest.TestCase):
                 self.assertIn(data["scope_note"], path.read_text(encoding="utf-8"))
             self.assertNotIn("submission", data["applications"][0])
 
+    def test_review_and_lesson_sources_remain_linked_to_advice(self):
+        with tempfile.TemporaryDirectory() as folder:
+            dest = initializer.initialize(Path(folder) / "demo", demo=True)
+            data = json.loads((dest / "applications/data.json").read_text(encoding="utf-8"))
+            app = data["applications"][0]
+            app["brief"]["basis"] = '合成观察 <script>alert("example")</script>'
+            before = copy.deepcopy(data)
+            html = dashboard.render_dashboard(tracker.validate(data), dest)
+            for key in ("review", "lessons"):
+                material = dest / app["materials"][key]
+                self.assertTrue(material.is_file())
+                self.assertIn(material.resolve().as_uri(), html)
+            self.assertIn("合成观察 &lt;script&gt;", html)
+            self.assertNotIn('<script>alert("example")</script>', html)
+            self.assertIn("project-opening.md", (dest / "lessons/README.md").read_text(encoding="utf-8"))
+            self.assertTrue((dest / "workflows/06-复盘与经验复用.md").is_file())
+            self.assertEqual(data, before)
+
 
 class WorkspaceTests(unittest.TestCase):
     def test_changed_resume_and_path_escape(self):
@@ -297,6 +410,35 @@ class WorkspaceTests(unittest.TestCase):
                 initializer.initialize(dest)
             with self.assertRaises(ValueError):
                 resume.verify(dest)
+
+
+class PackageTests(unittest.TestCase):
+    def test_versioned_archive_uses_committed_files_and_keeps_existing_output(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            def git(*args):
+                return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.STDOUT)
+            git("init", "--quiet")
+            (root / ".gitignore").write_text("private/\ndist/\n", encoding="utf-8")
+            (root / "README.md").write_text("Synthetic public template", encoding="utf-8")
+            git("add", ".")
+            git("-c", "user.name=Synthetic Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "-m", "Synthetic fixture")
+            (root / "private").mkdir()
+            (root / "private/personal.txt").write_text("Synthetic private fixture", encoding="utf-8")
+            revision = git("rev-parse", "--short", "HEAD").decode().strip()
+            with patch.object(packager, "ROOT", root):
+                target = packager.package()
+                self.assertEqual(target.name, f"job-prep-kit-source-{revision}.zip")
+                payload = target.read_bytes()
+                with zipfile.ZipFile(target) as archive:
+                    self.assertEqual(set(archive.namelist()), {"job-prep-kit/", "job-prep-kit/.gitignore", "job-prep-kit/README.md"})
+                with self.assertRaises(FileExistsError):
+                    packager.package()
+                self.assertEqual(target.read_bytes(), payload)
+                (root / "README.md").write_text("Uncommitted change", encoding="utf-8")
+                with self.assertRaisesRegex(ValueError, "已提交"):
+                    packager.package(root / "other.zip")
+                self.assertFalse((root / "other.zip").exists())
 
 
 class ScanTests(unittest.TestCase):

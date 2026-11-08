@@ -11,7 +11,7 @@ function applyFilter() {
   });
   const visible = rows.filter(row => !row.hidden).length;
   document.getElementById('visible-count').textContent = rows.length === 1 && filter === 'current' ? `当前 ${visible} 条` : `显示 ${visible} / ${rows.length} 条`;
-  document.getElementById('opportunity-title').textContent = filter === 'closed' ? '已结束的记录' : (filter === 'all' ? '全部岗位' : '当前岗位');
+  document.getElementById('opportunity-title').textContent = filter === 'closed' ? '历史与不再跟进的记录' : (filter === 'all' ? '全部岗位' : '当前岗位');
   document.getElementById('empty').hidden = visible > 0;
   filters.forEach(button => button.setAttribute('aria-pressed', String(button.dataset.filter === filter)));
 }

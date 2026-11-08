@@ -35,13 +35,17 @@ def initialize(destination, demo=False):
         "助手按 workflows/00-材料导入.md 读取已有内容，只补问影响结果的缺项，不需要先填完模板。\n\n"
         "经历与出处复用 records/facts.md；长经历再按需拆出详情。投递与日程只记 applications/data.json，"
         "JD、实际附件和面试记录通过 materials 关联。\n\n"
+        "有意义的准备、面试或重大事件后，助手按 workflows/06-复盘与经验复用.md 主动提出简短复盘。"
+        "事件留在原项目记录，有用经验加入 lessons/README.md；后续建议先查经验并说明具体采用之处。"
+        "暂停或只办收尾时告诉助手，它应调整当前跟进范围，保留原状态和历史材料。\n\n"
         "工具在原模板项目 scripts/ 中。运行 tracker.py render --workspace 指向本目录后，"
         "双击 applications/dashboard.html 查看本地看板；数据变化后重新生成。手工台账也可以继续使用。\n",
         encoding="utf-8")
     (destination / "README.md").write_text(
         "# 个人求职工作区\n\n先读 [开始使用](START.md) 和 [工作流](workflows/README.md)。\n\n"
         "PROFILE 保存偏好与网申字段；records/facts.md 保存经历证据；"
-        "applications/data.json 保存投递与日程，三个 Markdown 视图和本地看板由工具生成。\n\n"
+        "applications/data.json 保存投递、当前跟进范围与日程，三个 Markdown 视图和本地看板由工具生成。"
+        "事件复盘保存在原项目记录；可复用经验从 lessons/README.md 查阅，用于后续建议。\n\n"
         f"工具项目位置：`{ROOT}`。在该项目目录运行：\n\n"
         f'```powershell\npython scripts/tracker.py render --workspace "{destination}"\n```\n\n'
         "然后双击 applications/dashboard.html。现有文件可直接关联，不需要搬进本目录。\n\n"
@@ -66,8 +70,8 @@ def initialize(destination, demo=False):
         app["location"] = "示例城市 A"
         app["next_action"] = "把一次数据核对的过程讲清楚"
         app["events"] = [{"title": "技术面试", "at": (now + timedelta(days=1)).replace(hour=14, minute=0, second=0).isoformat(), "kind": "scheduled", "source": "interview", "done": False}]
-        app["materials"] = {"jd": "applications/synthetic-001/jd.md", "experience": "records/experiences/data-project.md", "interview": "interviews/synthetic-001.md"}
-        app["brief"] = {"work": "核对数据质量，整理图表并解释结果。", "reason": "课程项目中的数据核对经历，可用于说明岗位要求的分析过程。", "preparation": "练习两分钟回答：先说数据用途，再解释缺失项如何处理。", "question": "新人主要做分析方法改进，还是例行报表？"}
+        app["materials"] = {"jd": "applications/synthetic-001/jd.md", "experience": "records/experiences/data-project.md", "interview": "interviews/synthetic-001.md", "review": "interviews/synthetic-practice.md", "lessons": "lessons/project-opening.md"}
+        app["brief"] = {"work": "核对数据质量，整理图表并解释结果。", "reason": "课程项目中的数据核对经历，可用于说明岗位要求的分析过程。", "preparation": "练习两分钟回答：先说数据用途，再解释缺失项如何处理。", "question": "新人主要做分析方法改进，还是例行报表？", "basis": "合成练习中直接讲处理步骤，听者追问数据用途。因此本次先交代要回答的问题，再讲步骤；是否改善仍需下次练习验证。依据见事件复盘和复用经验。"}
         data["demo"] = True
         data["applications"].append({"id": "synthetic-002", "company": "示例应用团队", "project": "合成招聘项目", "role": "应用支持助理", "location": "工作地待核实", "status": "candidate", "sources": {}, "events": [], "needs_user": "确认是否考虑需要出差的岗位", "next_action": "了解实际出差频率，再判断是否申请", "brief": {"work": "协助产品演示和用户问题整理。", "reason": "有数据解释的相邻经历；客户现场工作仍需了解。", "question": "出差频率、驻场时长和工作城市均待核实。"}})
         for app_id, company, role, state, action, brief in (
@@ -91,12 +95,16 @@ def initialize(destination, demo=False):
             "applications/synthetic-003/notice.md": "# 合成测评通知\n\n全部为虚构资料，用于演示测评截止和准备动作。\n",
             "applications/synthetic-006/notice.md": "# 合成书面录用通知\n\n全部为虚构资料，用于演示书面录用、待核实条件和回复截止，不构成真实录用。\n",
             "records/experiences/data-project.md": "# 合成课程项目：公开数据整理\n\n事实ID：F001。来源：本演示虚构材料，不属于任何真实候选人。\n\n## 事实\n整理一份合成数据表，标记缺失项并制作图表；未提供性能或效率提升数字。\n\n## 可复用表达\n简历：整理数据、核对缺失项并制作图表说明。\n面试：先说明数据用于回答什么问题，再解释缺失项如何处理。\n\n## 相关反馈\n见 ../../interviews/synthetic-001.md；下次开场先交代问题和用途。\n",
-            "interviews/synthetic-001.md": "# 合成面试准备\n\n岗位 synthetic-001；相关经历见 ../records/experiences/data-project.md。\n\n问题：你如何检查数据质量？\n准备：讲清缺失项核对方法，不编造提升百分比。\n下一次改动：先说明数据用途，再讲处理步骤。\n",
+            "interviews/synthetic-001.md": "# 合成面试准备\n\n岗位 synthetic-001；相关经历见 ../records/experiences/data-project.md。\n\n问题：你如何检查数据质量？\n准备：讲清缺失项核对方法，不编造提升百分比。\n本次采用 [先交代项目用途](../lessons/project-opening.md) 的改法：先说明数据用于回答什么问题，再讲处理步骤；来自 [合成练习复盘](synthetic-practice.md)，效果仍待验证。\n",
+            "interviews/synthetic-practice.md": f"# 合成练习复盘\n\n日期：{now.date()}。全部内容虚构，用于演示一次已完成的练习，不是正式面试结果。\n\n观察：回答直接从缺失项处理开始，听者追问这份数据用于什么。\n解释：可能缺少问题背景；不能据此断定技术能力不足。\n下次改动：先用一句话交代用途，再解释核对步骤。验证方式：让听者复述数据回答的问题，尚未验证。\n\n提炼为 [项目开场经验](../lessons/project-opening.md)，用于 [下一次准备](synthetic-001.md)。\n",
+            "lessons/project-opening.md": f"# 讲项目先交代用途\n\n来源：[合成练习复盘](../interviews/synthetic-practice.md)，{now.date()}；虚构教学案例。\n\n适用问题：听者不了解项目背景，直接讲步骤时容易不清楚目标。\n改法：先说项目对象与用途，再解释判断和步骤。此假设来自一次合成反馈，是否改善仍待验证；不能推断为面试通过规律。若对方已经明确指定技术细节，则直接回答具体问题。\n\n当前应用：[synthetic-001 准备](../interviews/synthetic-001.md)。后续有实际反馈再补效果。\n",
             "records/facts.md": "# 合成经历索引\n\n| ID | 主题 | 来源/详情 | 状态 |\n|---|---|---|---|\n| F001 | 公开数据整理课程项目 | [详情](experiences/data-project.md) | 合成演示，不是真实经历 |\n"}
         for relative, content in demo_files.items():
             target = destination / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(content, encoding="utf-8")
+        with (destination / "lessons/README.md").open("a", encoding="utf-8") as f:
+            f.write("\n## 合成项目经验\n\n讲项目时听者不清楚用途 → [先交代项目用途](project-opening.md)，来自合成练习，效果待验证。\n")
         (destination / "applications/data.json").write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
         shutil.copy2(ROOT / "templates/demo.md", destination / "DEMO.md")
         with (destination / "START.md").open("a", encoding="utf-8") as f:

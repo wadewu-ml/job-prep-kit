@@ -6,7 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 
-def package(output):
+def package(output=None):
     def git(*args):
         return subprocess.check_output(["git", "-C", str(ROOT), *args])
 
@@ -16,7 +16,8 @@ def package(output):
     if any(name.startswith("private/") for name in names):
         raise ValueError("private/ 已被跟踪，拒绝打包；先处理隐私资料")
     payload = git("archive", "--format=zip", "--prefix=job-prep-kit/", "HEAD")
-    output = Path(output).resolve()
+    revision = git("rev-parse", "--short", "HEAD").decode("ascii").strip()
+    output = Path(output or ROOT / f"dist/job-prep-kit-source-{revision}.zip").resolve()
     output.parent.mkdir(parents=True, exist_ok=True)
     with output.open("xb") as f:
         f.write(payload)
@@ -25,7 +26,7 @@ def package(output):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--output", type=Path, default=ROOT / "dist/job-prep-kit-source.zip")
+    parser.add_argument("--output", type=Path, help="默认 dist/job-prep-kit-source-<commit>.zip；不覆盖已有文件")
     args = parser.parse_args()
     try:
         print(package(args.output))

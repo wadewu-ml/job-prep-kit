@@ -4,6 +4,8 @@ A local workspace for résumés, job applications, and interview preparation.
 
 Keep the job description, the résumé you sent, the latest reply, and your next step in one place. Use the included notes to work on your résumé, compare roles, prepare for interviews, and evaluate offers. You can work through the files yourself or use an AI assistant that can read and edit them.
 
+Useful feedback should carry forward. After a meaningful preparation session, interview or major event, the assistant proposes a short review, saves it with your project records, and draws on applicable lessons when making later recommendations.
+
 ## Getting started
 
 Download or clone this repository, then point your file-capable AI assistant at [SKILL.md](SKILL.md). Give it a résumé, a folder of project notes or a job description, and say what you want to work on:
@@ -30,10 +32,13 @@ This creates `private/START.md`. Existing documents can stay where they are; rec
 | Complete applications and follow up on replies | [Applications](workflows/03-投递管理.md) |
 | Practise for assessments and learn from interviews | [Interview preparation](workflows/04-面试复盘.md) |
 | Compare offers and check the details before accepting | [Offer decisions](workflows/05-Offer决策.md) |
+| Review a significant event and reuse what you learned | [Review and reuse](workflows/06-复盘与经验复用.md) |
 
 The workflow notes and templates are currently written in Chinese.
 
 Each guide points to the relevant files in your workspace. Keep evidence for résumé claims, save the version sent with each application, and record replies against the right role. An uploaded document is not a submitted application; a difficult interview is not a rejection.
+
+Reviews use existing interview or role documents. When an observation can inform future work, the assistant adds a lesson to your private `lessons/` directory and links it from the existing index. Later advice should say what changed because of that lesson, with a link to the source and its limits. There is no required review form or quota; tentative explanations stay tentative, and personal cases stay out of the public templates.
 
 ## Tracking applications
 
@@ -43,9 +48,11 @@ Update `private/applications/data.json`, then run:
 python scripts/tracker.py render --workspace private
 ```
 
-Open `private/applications/dashboard.html` in your browser. The page puts upcoming commitments and concrete next steps first. Below them, a compact opportunity list shows why a role is worth pursuing, what still needs checking, and the next step. Job descriptions, the résumé actually sent, relevant experience and interview notes stay linked to each role. Search the list or switch to completed applications; expand a row for materials and sources.
+Open `private/applications/dashboard.html` in your browser. The page puts upcoming commitments and concrete next steps first. Each role has separate sections for its overview, follow-up tasks and materials, with readable body text and a single-column layout in narrow windows. Job descriptions, the résumé actually sent, relevant experience, reviews and lessons stay linked to each role. Optional advice notes explain how a prior lesson affects the current preparation. Search or filter roles; expand the source and history section when needed.
 
-The dashboard is a local, read-only snapshot: no server, account or network connection is required. Ask the assistant to update the ledger, rerun the command and refresh the page. The same command also generates the application table, timeline and schedule. Completed events leave the schedule; offers awaiting a decision remain active. Waiting for a reply does not create a follow-up task. Optional role summaries can be added as you work; there is no profile-completion score or required intake form.
+The dashboard is a local, read-only snapshot: no server, account or network connection is required. Ask the assistant to update the ledger, rerun the command and refresh the page. The same command also generates the application table, timeline and schedule. Completed events leave the schedule; unresolved events more than seven days old move to a folded history list without being marked complete. Waiting for a reply does not create a follow-up task. Optional role summaries can be added as you work; there is no profile-completion score or required intake form.
+
+When your goal changes, tell the assistant. Optional `focus` settings distinguish active searching, paperwork, a pause and completion from employer status. Paperwork can remain visible for a signed role; stopping a search keeps other records as history without inventing rejection or withdrawal. The assistant updates the scope and next steps; the dashboard itself does not read conversations or extract lessons.
 
 `records/facts.md` doubles as the experience index. Longer project notes can live in separate files, linked from that index. Applications can link existing materials through optional `materials` fields; there is no second copy of the tracking data.
 
